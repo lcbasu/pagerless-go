@@ -1,0 +1,85 @@
+{
+  "events": [
+    {
+      "v": 1,
+      "id": "evt_00000002",
+      "type": "error",
+      "ts": 1792670400000,
+      "service": "shop",
+      "env": "production",
+      "release": "2026.10.22-1",
+      "fingerprint": "dbaec3f365ca36320888dcb040efd1e8",
+      "route": "POST /checkout",
+      "count": 1,
+      "status": 502,
+      "error": {
+        "type": "*stripe.CardError",
+        "message": "card [card] declined for [email]",
+        "stack": "shop/pay.Charge()\n\t/src/shop/pay/charge.go:42\n"
+      },
+      "tags": {
+        "api_key": "[redacted]",
+        "phase": "startup",
+        "plan": "pro"
+      }
+    },
+    {
+      "v": 1,
+      "id": "evt_00000003",
+      "type": "custom",
+      "ts": 1792670400000,
+      "service": "shop",
+      "env": "production",
+      "release": "2026.10.22-1",
+      "fingerprint": "6f8d4621490b508053c38642aca909c4",
+      "count": 1,
+      "tags": {
+        "by": "ops"
+      },
+      "severity": "tell",
+      "title": "Refunds paused"
+    },
+    {
+      "v": 1,
+      "id": "dep_c543c3df7bc61d1b0b53f43a71b9ae24",
+      "type": "deploy",
+      "ts": 1792670400000,
+      "service": "shop",
+      "env": "production",
+      "release": "2026.10.22-2",
+      "count": 1,
+      "title": "Deployed 2026.10.22-2"
+    },
+    {
+      "v": 1,
+      "id": "evt_00000004",
+      "type": "metric",
+      "ts": 1792670410000,
+      "service": "shop",
+      "env": "production",
+      "release": "2026.10.22-1",
+      "route": "POST /checkout",
+      "count": 2,
+      "window_s": 10,
+      "status": 502,
+      "metric": {
+        "name": "http.server.duration",
+        "value": 100,
+        "unit": "ms"
+      },
+      "tags": {
+        "max_ms": "120"
+      }
+    },
+    {
+      "v": 1,
+      "id": "evt_00000005",
+      "type": "heartbeat",
+      "ts": 1792670410000,
+      "service": "shop",
+      "env": "production",
+      "release": "2026.10.22-1",
+      "count": 1
+    }
+  ]
+}
