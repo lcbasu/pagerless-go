@@ -16,15 +16,38 @@ import (
 // your own recovery) still handles it as before. Uses the default client at request time, so it
 // can be installed before Init.
 func Middleware(h http.Handler) http.Handler {
-	return middleware(func() *Client { return std.Load() }, h)
+	return middleware(Default, h, nil)
 }
 
 // Middleware is the per-client version of the package-level Middleware.
 func (c *Client) Middleware(h http.Handler) http.Handler {
-	return middleware(func() *Client { return c }, h)
+	return middleware(func() *Client { return c }, h, nil)
 }
 
-func middleware(client func() *Client, h http.Handler) http.Handler {
+// RouteFunc names the route template a request matched ("/orders/{id}"), read after the handler
+// ran; "" when there is none. Routers that don't set r.Pattern (chi, gorilla/mux) supply one.
+type RouteFunc func(r *http.Request) string
+
+// MiddlewareRoutes is Middleware for routers that keep the matched route themselves: route names
+// it. The adapters (github.com/lcbasu/pagerless-go/chi, .../gorillamux) are built on it.
+func MiddlewareRoutes(h http.Handler, route RouteFunc) http.Handler {
+	return middleware(Default, h, route)
+}
+
+// MiddlewareRoutes is the per-client version of the package-level MiddlewareRoutes.
+func (c *Client) MiddlewareRoutes(h http.Handler, route RouteFunc) http.Handler {
+	return middleware(func() *Client { return c }, h, route)
+}
+
+func middleware(client func() *Client, h http.Handler, name RouteFunc) http.Handler {
+	routeOf := func(r *http.Request, status int) string {
+		if name != nil {
+			if n := name(r); n != "" {
+				return methodRoute(r.Method, n)
+			}
+		}
+		return routeOf(r, status)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c := client()
 		if !c.active() {
@@ -56,20 +79,31 @@ func (c *Client) reportPanic(v any, route string) {
 	c.captureError(typ, msg, callers(1), []CaptureOption{Route(route), Status(http.StatusInternalServerError)})
 }
 
+// methodRoute prefixes a template with the method unless it already has one ("GET /x").
+func methodRoute(method, route string) string {
+	if strings.ContainsAny(route, " \t") || method == "" {
+		return route
+	}
+	return method + " " + route
+}
+
 // routeOf names the request's route. ServeMux sets r.Pattern on the same *Request we hold, so it
 // is available after the handler ran. Without a pattern the path is normalised (IDs collapsed)
 // to keep cardinality bounded; unmatched 404s collapse to one route.
 func routeOf(r *http.Request, status int) string {
 	if p := r.Pattern; p != "" {
-		if strings.ContainsAny(p, " \t") {
-			return p
-		}
-		return r.Method + " " + p
+		return methodRoute(r.Method, p)
 	}
+	return RouteFor(r.Method, r.URL.Path, status)
+}
+
+// RouteFor names a request no router template matched: the method and the path with ID-like
+// segments collapsed ("GET /files/:id"), or "GET (unmatched)" for a 404, so routes stay few.
+func RouteFor(method, path string, status int) string {
 	if status == http.StatusNotFound {
-		return r.Method + " (unmatched)"
+		return method + " (unmatched)"
 	}
-	return r.Method + " " + normalizePath(r.URL.Path)
+	return method + " " + normalizePath(path)
 }
 
 var (

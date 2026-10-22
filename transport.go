@@ -15,7 +15,7 @@ import (
 const (
 	backoffBase = time.Second
 	backoffMax  = 5 * time.Minute
-	userAgent   = "pagerless-go/0.1"
+	userAgent   = "pagerless-go/0.2"
 )
 
 // sendResult classifies one POST.

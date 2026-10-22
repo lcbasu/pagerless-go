@@ -14,6 +14,7 @@ import (
 
 const (
 	sdkPkg         = "github.com/lcbasu/pagerless-go."
+	adapterPkg     = "github.com/lcbasu/pagerless-go/" // framework adapters, each its own module
 	maxStackFrames = 64
 	// fingerprintFrames is how many in-app frames feed the grouping key.
 	fingerprintFrames = 5
@@ -54,17 +55,29 @@ func isRuntime(fn string) bool { return strings.HasPrefix(fn, "runtime.") }
 
 // isSDK matches SDK frames but not the SDK's own tests, so tests see their frames as in-app.
 func isSDK(f runtime.Frame) bool {
-	return strings.HasPrefix(f.Function, sdkPkg) && !strings.HasSuffix(f.File, "_test.go")
+	return isSDKFunc(f.Function) && !strings.HasSuffix(f.File, "_test.go")
+}
+
+func isSDKFunc(fn string) bool {
+	return strings.HasPrefix(fn, sdkPkg) || strings.HasPrefix(fn, adapterPkg)
+}
+
+// frameworkPkgs are never the cause: stdlib and router plumbing below user handlers.
+var frameworkPkgs = []string{
+	"runtime.", "net/http.", "testing.", "reflect.", "log/slog.",
+	"github.com/gin-gonic/gin.", "github.com/labstack/echo/", "github.com/gofiber/fiber/",
+	"github.com/valyala/fasthttp.", "github.com/go-chi/chi/", "github.com/gorilla/mux.",
+	"google.golang.org/grpc.", "google.golang.org/grpc/", "go.temporal.io/sdk/",
 }
 
 // isFramework marks frames that are never the cause: stdlib and router plumbing below user handlers.
 func isFramework(f frame) bool {
-	for _, p := range []string{"runtime.", "net/http.", "testing.", "reflect.", "github.com/gin-gonic/gin."} {
+	for _, p := range frameworkPkgs {
 		if strings.HasPrefix(f.Function, p) {
 			return true
 		}
 	}
-	return strings.HasPrefix(f.Function, sdkPkg) && !strings.HasSuffix(f.File, "_test.go")
+	return isSDKFunc(f.Function) && !strings.HasSuffix(f.File, "_test.go")
 }
 
 // formatStack renders frames like a Go panic trace.

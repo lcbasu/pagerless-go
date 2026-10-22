@@ -262,9 +262,24 @@ func (c *Client) stamp(ev *wireEvent) {
 // CaptureOption adds context to Capture.
 type CaptureOption func(*wireEvent)
 
-// Tags attaches tags (scrubbed; values under secret-looking keys are redacted).
+// Tags attaches tags (scrubbed; values under secret-looking keys are redacted). Several Tags
+// options add up; a later key wins.
 func Tags(tags map[string]string) CaptureOption {
-	return func(e *wireEvent) { e.Tags = cleanTags(tags) }
+	return func(e *wireEvent) {
+		clean := cleanTags(tags)
+		if len(e.Tags) == 0 {
+			e.Tags = clean
+			return
+		}
+		merged := make(map[string]string, len(e.Tags)+len(clean))
+		maps.Copy(merged, e.Tags)
+		for k, v := range clean {
+			if _, have := merged[k]; have || len(merged) < maxTags {
+				merged[k] = v
+			}
+		}
+		e.Tags = merged
+	}
 }
 
 // Route sets the route the error happened on, e.g. "POST /checkout".
@@ -272,6 +287,16 @@ func Route(route string) CaptureOption { return func(e *wireEvent) { e.Route = r
 
 // Status sets the HTTP status the error produced.
 func Status(code int) CaptureOption { return func(e *wireEvent) { e.Status = code } }
+
+// ErrorType overrides the error's type name, which groups problems: use it when the type of
+// err says less than a name the app already has (a Temporal ApplicationError's Type, say).
+func ErrorType(name string) CaptureOption {
+	return func(e *wireEvent) {
+		if name != "" && e.Error != nil {
+			e.Error.Type = truncate(name, maxErrType)
+		}
+	}
+}
 
 // Capture reports err. Repeats of the same problem (type + call site + route) are counted, not
 // re-sent. Safe to call with a nil error (no-op).
@@ -300,7 +325,7 @@ func (c *Client) captureError(typ, msg string, frames []frame, opts []CaptureOpt
 		tags[tagPhase] = phaseStartup
 		ev.Tags = tags
 	}
-	ev.Fingerprint = fingerprint(typeError, typ, ev.Route, frames)
+	ev.Fingerprint = fingerprint(typeError, ev.Error.Type, ev.Route, frames)
 	c.record(ev)
 }
 
